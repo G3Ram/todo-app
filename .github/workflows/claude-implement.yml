@@ -1,0 +1,64 @@
+# The assembly line.
+# Add the "agent-ready" label to an issue -> Claude implements it, runs the checks,
+# and opens the PR itself. CI and the review workflow then run on that PR.
+name: Claude Implement
+
+on:
+  issues:
+    types: [labeled]
+
+concurrency:
+  group: implement-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  implement:
+    # Only this label starts a run. Without this check, every label burns minutes.
+    if: github.event.label.name == 'agent-ready'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    env:
+      # Personal access token so the PR Claude opens triggers CI and review.
+      # PRs opened with the default GITHUB_TOKEN don't start other workflows.
+      GH_TOKEN: ${{ secrets.FACTORY_PAT }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.FACTORY_PAT }}   # git push uses this too
+
+      # Install deps so Claude can run the AGENTS.md commands.
+      # Keep Node even if you drop the frontend: Ponytail's hooks need it.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --prefix web
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --directory api
+
+      - run: |
+          git config user.name "factory-bot"
+          git config user.email "factory-bot@users.noreply.github.com"
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Skills: Ponytail keeps code lean, security-guidance flags risky edits as they happen.
+          plugin_marketplaces: |
+            https://github.com/DietrichGebert/ponytail.git
+            https://github.com/anthropics/claude-code.git
+          plugins: |
+            ponytail@ponytail
+            security-guidance@claude-code-plugins
+          prompt: "/implement-issue ${{ github.event.issue.number }}"
+          claude_args: |
+            --max-turns 60
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(git:*),Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh pr create:*),Bash(gh pr list:*),Bash(npm:*),Bash(npx:*),Bash(uv:*)"

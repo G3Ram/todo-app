@@ -1,0 +1,42 @@
+name: Agent task
+description: A task for Claude to pick up. Add the agent-ready label when it's ready to go.
+title: "[agent] "
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What should be different when this is done? One or two sentences.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: How do we know it's done? Make each item checkable.
+      placeholder: |
+        - [ ] Clicking "Next" on the last fable loops back to the first one
+        - [ ] Unit test covers the loop-back case
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: Where to look
+      description: Files, components, or functions that are probably involved.
+      placeholder: web/src/components/FablePlayer.tsx
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: Things the agent should NOT change.
+  - type: dropdown
+    id: size
+    attributes:
+      label: Size
+      options:
+        - Small (one file, under an hour for a human)
+        - Medium (a few files)
+        - Large (split this up first)
+    validations:
+      required: true

@@ -1,0 +1,52 @@
+# The helper. Mention @claude in any issue or PR comment to ask a question
+# or request a change (for example, "@claude fix the review comments").
+# For implementing a whole issue, use the agent-ready label instead (claude-implement.yml).
+name: Claude
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+concurrency:
+  group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  claude:
+    if: contains(github.event.comment.body, '@claude')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read   # lets Claude read CI results on PRs
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      # Keep Node even if you drop the frontend: Ponytail's hooks need it.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --prefix web
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --directory api
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          plugin_marketplaces: |
+            https://github.com/DietrichGebert/ponytail.git
+            https://github.com/anthropics/claude-code.git
+          plugins: |
+            ponytail@ponytail
+            security-guidance@claude-code-plugins
+          claude_args: |
+            --max-turns 40

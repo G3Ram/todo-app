@@ -1,0 +1,14 @@
+{
+  "extraKnownMarketplaces": {
+    "ponytail": {
+      "source": { "source": "github", "repo": "DietrichGebert/ponytail" }
+    },
+    "claude-code-plugins": {
+      "source": { "source": "github", "repo": "anthropics/claude-code" }
+    }
+  },
+  "enabledPlugins": {
+    "ponytail@ponytail": true,
+    "security-guidance@claude-code-plugins": true
+  }
+}
