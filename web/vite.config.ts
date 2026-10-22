@@ -16,5 +16,14 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
+    // Unit tests only. Playwright end-to-end tests live in e2e/ and run separately.
+    include: ['src/**/*.test.{ts,tsx}'],
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/**/*.test.{ts,tsx}', 'src/test/**', 'src/main.tsx', 'src/**/*.d.ts'],
+      // CI fails below these. Raise them over time, never lower them to get a PR through.
+      thresholds: { lines: 85, statements: 85, functions: 80, branches: 80 },
+    },
   },
 })

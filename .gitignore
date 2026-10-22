@@ -4,3 +4,9 @@ dist/
 .env.*
 !.env.example
 .DS_Store
+
+# Test and coverage output
+coverage/
+.coverage
+playwright-report/
+test-results/

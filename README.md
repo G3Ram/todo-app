@@ -37,5 +37,21 @@ Issues labeled `human` are for you (GCP setup, secrets). Agents can't do those.
 | 2 | Real database: Firestore behind the repository interface | 06 |
 | 3 | Deploy: Cloud Run + Firebase Hosting | 07-09 |
 | 4 | Agentic: natural-language add, task breakdown, MCP server | 10-12 |
+| Q | Quality: e2e, API contract, Firestore integration, smoke test, evals | 13-17 |
 
 See `backlog/README.md` for the order and how to create the issues.
+
+## Quality and security gates
+
+Every PR has to pass these before it can merge:
+
+| Check | What it catches |
+|---|---|
+| Lint, format, types | Sloppy or inconsistent code, type errors |
+| Unit + API tests with coverage floors (85%) | Broken behavior, untested changes |
+| `pip-audit`, `npm audit`, dependency review | Known-vulnerable or unwanted dependencies |
+| CodeQL (`security-extended`) | Injection, XSS, unsafe patterns in Python and TypeScript |
+| API contract, e2e, Firestore integration | UI and API drifting apart, broken user flows, storage bugs (turn on as issues 13-15 land) |
+| Codex review | Logic and design problems, rule violations from `AGENTS.md` |
+
+Plus GitHub secret scanning with push protection, and Dependabot. See `SECURITY.md`.

@@ -29,8 +29,27 @@ Go in order. Each one builds on the last.
 | 10 | Natural-language add | agent | Medium |
 | 11 | Break a todo into steps | agent | Medium |
 | 12 | Todos as an MCP server | agent | Medium |
+| 13 | End-to-end tests (Playwright) | agent | Medium |
+| 14 | API contract types | agent | Small |
+| 15 | Firestore integration tests | agent | Medium |
+| 16 | Post-deploy smoke test | agent | Small |
+| 17 | Evals for natural-language add | agent | Medium |
+
+13-17 are the quality issues. CI already has jobs waiting for 13, 14, and 15: each one turns on by itself once its tests exist. Good order to slot them in: 14 any time, 13 after 03, 15 after 06 and 08, 16 after 07, 17 after 10.
 
 Phase 4 (10-12) needs an LLM API key in Cloud Run. Decide which model provider before starting it.
+
+## Let the orchestrator run the queue
+
+Queue issues and the orchestrator starts the next one every time you merge an agent PR.
+
+```bash
+for n in <issue numbers>; do gh issue edit $n --add-label queued; done
+gh variable set ORCHESTRATOR_ENABLED --body true    # turn it on
+gh workflow run orchestrator.yml                     # start the first task
+```
+
+Pause with `gh variable set ORCHESTRATOR_ENABLED --body false`. Add `blocked` to skip an issue, or put `Depends on #N` in its body.
 
 ## Tips
 
