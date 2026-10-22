@@ -8,8 +8,9 @@ cd "$(dirname "$0")/.."
 # Labels (no-op if they exist already)
 for spec in "phase-1-core:0e8a16" "phase-2-database:1d76db" "phase-3-deploy:fbca04" \
             "phase-4-agentic:d93f0b" "human:b60205" "agent-ready:7057ff" \
-            "queued:c5def5" "blocked:000000" "testing:5319e7"; do
-  gh label create "${spec%%:*}" --color "${spec##*:}" 2>/dev/null || true
+            "queued:c5def5" "blocked:000000" "testing:5319e7" \
+            "model:haiku:bfd4f2" "model:sonnet:bfd4f2" "model:opus:bfd4f2"; do
+  gh label create "${spec%:*}" --color "${spec##*:}" 2>/dev/null || true
 done
 
 if [ $# -eq 0 ]; then
