@@ -76,6 +76,28 @@ describe('App', () => {
     expect(box).not.toBeChecked()
   })
 
+  it('deletes a todo after the API succeeds', async () => {
+    vi.mocked(api.listTodos).mockResolvedValue([todo('1', 'Buy milk')])
+    vi.mocked(api.deleteTodo).mockResolvedValue(undefined)
+    render(<App />)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete Buy milk' }))
+
+    expect(api.deleteTodo).toHaveBeenCalledWith('1')
+    expect(screen.queryByText('Buy milk')).not.toBeInTheDocument()
+  })
+
+  it('keeps the todo and shows an error when delete fails', async () => {
+    vi.mocked(api.listTodos).mockResolvedValue([todo('1', 'Buy milk')])
+    vi.mocked(api.deleteTodo).mockRejectedValue(new Error('down'))
+    render(<App />)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete Buy milk' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not delete todo.')
+    expect(screen.getByText('Buy milk')).toBeInTheDocument()
+  })
+
   it('shows an error when loading fails', async () => {
     vi.mocked(api.listTodos).mockRejectedValue(new Error('down'))
     render(<App />)

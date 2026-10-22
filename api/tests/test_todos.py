@@ -44,5 +44,15 @@ def test_patch_unknown_id_is_404(client: TestClient) -> None:
     assert client.patch("/todos/nope", json={"done": True}).status_code == 404
 
 
+def test_delete_removes_todo(client: TestClient) -> None:
+    todo = client.post("/todos", json={"title": "x"}).json()
+    assert client.delete(f"/todos/{todo['id']}").status_code == 204
+    assert client.get("/todos").json() == []
+
+
+def test_delete_unknown_id_is_404(client: TestClient) -> None:
+    assert client.delete("/todos/nope").status_code == 404
+
+
 def test_rejects_long_title(client: TestClient) -> None:
     assert client.post("/todos", json={"title": "x" * 201}).status_code == 422
