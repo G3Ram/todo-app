@@ -4,6 +4,7 @@ export type Todo = {
   id: string
   title: string
   done: boolean
+  due_date: string | null
   created_at: string
 }
 
@@ -44,9 +45,9 @@ export function deleteTodo(id: string): Promise<void> {
   return request<void>(`/todos/${id}`, { method: 'DELETE' })
 }
 
-export function createTodo(title: string): Promise<Todo> {
+export function createTodo(title: string, dueDate?: string): Promise<Todo> {
   return request<Todo>('/todos', {
     method: 'POST',
-    body: JSON.stringify({ title }),
+    body: JSON.stringify(dueDate ? { title, due_date: dueDate } : { title }),
   })
 }

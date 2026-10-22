@@ -10,6 +10,7 @@ const todo = (id: string, title: string): api.Todo => ({
   id,
   title,
   done: false,
+  due_date: null,
   created_at: '2026-10-21T00:00:00Z',
 })
 
@@ -38,9 +39,37 @@ describe('App', () => {
     await userEvent.type(await screen.findByLabelText('New todo'), 'Walk dog')
     await userEvent.click(screen.getByRole('button', { name: 'Add' }))
 
-    expect(api.createTodo).toHaveBeenCalledWith('Walk dog')
+    expect(api.createTodo).toHaveBeenCalledWith('Walk dog', undefined)
     expect(await screen.findByText('Walk dog')).toBeInTheDocument()
     expect(screen.getByLabelText('New todo')).toHaveValue('')
+  })
+
+  it('adds a todo with a due date', async () => {
+    vi.mocked(api.listTodos).mockResolvedValue([])
+    vi.mocked(api.createTodo).mockResolvedValue({ ...todo('2', 'Walk dog'), due_date: '2099-01-05' })
+    render(<App />)
+
+    await userEvent.type(await screen.findByLabelText('New todo'), 'Walk dog')
+    await userEvent.type(screen.getByLabelText('Due date'), '2099-01-05')
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+    expect(api.createTodo).toHaveBeenCalledWith('Walk dog', '2099-01-05')
+    expect(await screen.findByText('Jan 5, 2099')).toBeInTheDocument()
+    expect(screen.getByLabelText('Due date')).toHaveValue('')
+  })
+
+  it('marks past-due undone todos as overdue, but not done or future ones', async () => {
+    vi.mocked(api.listTodos).mockResolvedValue([
+      { ...todo('1', 'late'), due_date: '2000-01-02' },
+      { ...todo('2', 'finished'), due_date: '2000-01-03', done: true },
+      { ...todo('3', 'later'), due_date: '2099-01-04' },
+    ])
+    render(<App />)
+
+    expect(await screen.findByText('Overdue: Jan 2, 2000')).toBeInTheDocument()
+    expect(screen.getByText('Jan 3, 2000')).toBeInTheDocument()
+    expect(screen.getByText('Jan 4, 2099')).toBeInTheDocument()
+    expect(screen.getAllByText(/Overdue/)).toHaveLength(1)
   })
 
   it('ignores blank input', async () => {
