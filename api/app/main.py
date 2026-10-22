@@ -2,10 +2,10 @@ import os
 from functools import lru_cache
 from typing import Annotated
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.models import Todo, TodoCreate
+from app.models import Todo, TodoCreate, TodoUpdate
 from app.repository import InMemoryTodoRepository, TodoRepository
 
 app = FastAPI(title="Todo API")
@@ -41,3 +41,11 @@ def list_todos(repo: Repo) -> list[Todo]:
 @app.post("/todos", status_code=201)
 def create_todo(data: TodoCreate, repo: Repo) -> Todo:
     return repo.create(data)
+
+
+@app.patch("/todos/{todo_id}")
+def update_todo(todo_id: str, data: TodoUpdate, repo: Repo) -> Todo:
+    todo = repo.update(todo_id, data)
+    if todo is None:
+        raise HTTPException(status_code=404, detail="Todo not found")
+    return todo

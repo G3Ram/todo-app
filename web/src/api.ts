@@ -25,6 +25,13 @@ export function listTodos(): Promise<Todo[]> {
   return request<Todo[]>('/todos')
 }
 
+export function setTodoDone(id: string, done: boolean): Promise<Todo> {
+  return request<Todo>(`/todos/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ done }),
+  })
+}
+
 export function createTodo(title: string): Promise<Todo> {
   return request<Todo>('/todos', {
     method: 'POST',

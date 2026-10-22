@@ -51,6 +51,31 @@ describe('App', () => {
     expect(api.createTodo).not.toHaveBeenCalled()
   })
 
+  it('marks a todo done', async () => {
+    vi.mocked(api.listTodos).mockResolvedValue([todo('1', 'Buy milk')])
+    vi.mocked(api.setTodoDone).mockResolvedValue({ ...todo('1', 'Buy milk'), done: true })
+    render(<App />)
+
+    const box = await screen.findByLabelText('Buy milk')
+    await userEvent.click(box)
+
+    expect(api.setTodoDone).toHaveBeenCalledWith('1', true)
+    expect(box).toBeChecked()
+    expect(screen.getByText('Buy milk').closest('li')).toHaveClass('done')
+  })
+
+  it('reverts the checkbox and shows an error when update fails', async () => {
+    vi.mocked(api.listTodos).mockResolvedValue([todo('1', 'Buy milk')])
+    vi.mocked(api.setTodoDone).mockRejectedValue(new Error('down'))
+    render(<App />)
+
+    const box = await screen.findByLabelText('Buy milk')
+    await userEvent.click(box)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not update todo.')
+    expect(box).not.toBeChecked()
+  })
+
   it('shows an error when loading fails', async () => {
     vi.mocked(api.listTodos).mockRejectedValue(new Error('down'))
     render(<App />)

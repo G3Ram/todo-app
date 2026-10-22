@@ -29,5 +29,20 @@ def test_rejects_empty_title(client: TestClient) -> None:
     assert client.post("/todos", json={"title": ""}).status_code == 422
 
 
+def test_mark_done_and_undone(client: TestClient) -> None:
+    todo = client.post("/todos", json={"title": "x"}).json()
+    res = client.patch(f"/todos/{todo['id']}", json={"done": True})
+    assert res.status_code == 200
+    assert res.json()["done"] is True
+    assert client.get("/todos").json()[0]["done"] is True
+
+    res = client.patch(f"/todos/{todo['id']}", json={"done": False})
+    assert res.json()["done"] is False
+
+
+def test_patch_unknown_id_is_404(client: TestClient) -> None:
+    assert client.patch("/todos/nope", json={"done": True}).status_code == 404
+
+
 def test_rejects_long_title(client: TestClient) -> None:
     assert client.post("/todos", json={"title": "x" * 201}).status_code == 422
