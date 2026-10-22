@@ -52,7 +52,21 @@ jobs:
           git config user.name "factory-bot"
           git config user.email "factory-bot@users.noreply.github.com"
 
+      # Model routing: a model:<name> label wins, then the issue's Size, then the default.
+      # Change defaults with repo variables (MODEL_SMALL, MODEL_MEDIUM, MODEL_LARGE, MODEL_DEFAULT).
+      - name: Pick model
+        id: route
+        env:
+          ISSUE_LABELS: ${{ toJSON(github.event.issue.labels.*.name) }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          MODEL_SMALL: ${{ vars.MODEL_SMALL }}
+          MODEL_MEDIUM: ${{ vars.MODEL_MEDIUM }}
+          MODEL_LARGE: ${{ vars.MODEL_LARGE }}
+          MODEL_DEFAULT: ${{ vars.MODEL_DEFAULT }}
+        run: bash scripts/pick-model.sh
+
       - uses: anthropics/claude-code-action@v1
+        id: claude
         # Step timeout (not just the job timeout) so the safety net below still gets to run.
         timeout-minutes: 45
         with:
@@ -69,6 +83,7 @@ jobs:
             security-guidance@claude-code-plugins
           prompt: "/implement-issue ${{ github.event.issue.number }}"
           claude_args: |
+            --model ${{ steps.route.outputs.model }}
             --max-turns 100
             --allowedTools "Read,Edit,Write,Glob,Grep,Bash(git:*),Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh pr create:*),Bash(gh pr list:*),Bash(npm:*),Bash(npx:*),Bash(uv:*)"
 
@@ -102,3 +117,22 @@ jobs:
             --title "WIP: #$ISSUE (agent run did not finish)" \
             --body "$(printf 'Closes #%s\n\nThe agent run stopped before finishing (turn limit, timeout, or error), so this is whatever it got done. Checks may be failing.\n\n**Next:** look at the diff and the run log, then either finish it here (for example comment `@claude finish this and make the checks pass`) or close it and fix the issue text.\n\nRun log: %s' "$ISSUE" "$RUN_URL")"
           gh issue comment "$ISSUE" --body "The agent run didn't finish. Saved its work as a draft PR for you to check. Run log: $RUN_URL"
+
+      # Model, turns, tokens, and estimated cost: posted on the PR and the job summary,
+      # and saved as an artifact so scripts/usage-report.sh can total it up.
+      - name: Usage report
+        if: always()
+        env:
+          EXEC_FILE: ${{ steps.claude.outputs.execution_file || format('{0}/claude-execution-output.json', runner.temp) }}
+          USAGE_OUT: ${{ runner.temp }}/agent-usage.json
+          MODEL_REASON: ${{ steps.route.outputs.reason }}
+        run: bash scripts/agent-usage.sh "$EXEC_FILE" implement "$ISSUE"
+
+      - name: Save usage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: agent-usage
+          path: ${{ runner.temp }}/agent-usage.json
+          if-no-files-found: ignore
+          retention-days: 90

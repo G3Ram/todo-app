@@ -38,9 +38,30 @@ jobs:
         with:
           fetch-depth: 1
       - uses: anthropics/claude-code-action@v1
+        id: claude
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: "/orchestrate ${{ github.event.pull_request.number }}"
+          # Picking the next issue is simple bookkeeping, so it runs on the cheapest model.
+          # Change with: gh variable set MODEL_ORCHESTRATOR --body sonnet
           claude_args: |
+            --model ${{ vars.MODEL_ORCHESTRATOR || 'haiku' }}
             --max-turns 15
             --allowedTools "Read,Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh pr comment:*)"
+
+      - name: Usage report
+        if: always()
+        env:
+          EXEC_FILE: ${{ steps.claude.outputs.execution_file || format('{0}/claude-execution-output.json', runner.temp) }}
+          USAGE_OUT: ${{ runner.temp }}/agent-usage.json
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash scripts/agent-usage.sh "$EXEC_FILE" orchestrator
+
+      - name: Save usage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: agent-usage
+          path: ${{ runner.temp }}/agent-usage.json
+          if-no-files-found: ignore
+          retention-days: 90

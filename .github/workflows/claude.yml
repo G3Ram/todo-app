@@ -44,6 +44,7 @@ jobs:
       - run: uv sync --directory api
 
       - uses: anthropics/claude-code-action@v1
+        id: claude
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           plugin_marketplaces: |
@@ -52,5 +53,24 @@ jobs:
           plugins: |
             ponytail@ponytail
             security-guidance@claude-code-plugins
+          # Change with: gh variable set MODEL_HELPER --body opus
           claude_args: |
+            --model ${{ vars.MODEL_HELPER || 'sonnet' }}
             --max-turns 40
+
+      - name: Usage report
+        if: always()
+        env:
+          EXEC_FILE: ${{ steps.claude.outputs.execution_file || format('{0}/claude-execution-output.json', runner.temp) }}
+          USAGE_OUT: ${{ runner.temp }}/agent-usage.json
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash scripts/agent-usage.sh "$EXEC_FILE" helper
+
+      - name: Save usage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: agent-usage
+          path: ${{ runner.temp }}/agent-usage.json
+          if-no-files-found: ignore
+          retention-days: 90
