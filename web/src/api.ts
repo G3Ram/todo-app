@@ -33,6 +33,13 @@ export function setTodoDone(id: string, done: boolean): Promise<Todo> {
   })
 }
 
+export function renameTodo(id: string, title: string): Promise<Todo> {
+  return request<Todo>(`/todos/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ title }),
+  })
+}
+
 export function deleteTodo(id: string): Promise<void> {
   return request<void>(`/todos/${id}`, { method: 'DELETE' })
 }

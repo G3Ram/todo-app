@@ -1,11 +1,33 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { createTodo, deleteTodo, listTodos, setTodoDone, type Todo } from './api'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { createTodo, deleteTodo, listTodos, renameTodo, setTodoDone, type Todo } from './api'
 
 export default function App() {
   const [todos, setTodos] = useState<Todo[]>([])
   const [title, setTitle] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState<{ id: string; text: string } | null>(null)
+  const editDone = useRef(false) // Enter/Escape unmount the input, which can still fire a blur
+
+  function startEdit(todo: Todo) {
+    editDone.current = false
+    setEditing({ id: todo.id, text: todo.title })
+  }
+
+  async function finishEdit(todo: Todo, save: boolean) {
+    if (editDone.current || !editing) return
+    editDone.current = true
+    const text = editing.text.trim()
+    setEditing(null)
+    if (!save || !text || text === todo.title) return
+    try {
+      const updated = await renameTodo(todo.id, text)
+      setTodos((prev) => prev.map((t) => (t.id === todo.id ? updated : t)))
+      setError(null)
+    } catch {
+      setError('Could not rename todo.')
+    }
+  }
 
   useEffect(() => {
     listTodos()
@@ -79,14 +101,32 @@ export default function App() {
         <ul className="todo-list">
           {todos.map((todo) => (
             <li key={todo.id} className={todo.done ? 'done' : undefined}>
-              <label>
+              {editing?.id === todo.id ? (
                 <input
-                  type="checkbox"
-                  checked={todo.done}
-                  onChange={(e) => handleToggle(todo.id, e.target.checked)}
+                  aria-label={`Edit title of ${todo.title}`}
+                  value={editing.text}
+                  maxLength={200}
+                  autoFocus
+                  onChange={(e) => setEditing({ id: todo.id, text: e.target.value })}
+                  onBlur={() => finishEdit(todo, true)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') finishEdit(todo, true)
+                    if (e.key === 'Escape') finishEdit(todo, false)
+                  }}
                 />
-                <span>{todo.title}</span>
-              </label>
+              ) : (
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={todo.done}
+                    onChange={(e) => handleToggle(todo.id, e.target.checked)}
+                  />
+                  <span onDoubleClick={() => startEdit(todo)}>{todo.title}</span>
+                </label>
+              )}
+              <button type="button" aria-label={`Edit ${todo.title}`} onClick={() => startEdit(todo)}>
+                Edit
+              </button>
               <button type="button" aria-label={`Delete ${todo.title}`} onClick={() => handleDelete(todo.id)}>
                 ×
               </button>

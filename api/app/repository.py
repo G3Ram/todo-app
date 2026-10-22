@@ -42,7 +42,7 @@ class InMemoryTodoRepository:
         todo = self._todos.get(todo_id)
         if todo is None:
             return None
-        updated = todo.model_copy(update={"done": data.done})
+        updated = todo.model_copy(update=data.model_dump(exclude_none=True))
         self._todos[todo_id] = updated
         return updated
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createTodo, listTodos, setTodoDone } from './api'
+import { createTodo, listTodos, renameTodo, setTodoDone } from './api'
 
 const todo = { id: '1', title: 'Buy milk', done: false, created_at: '2026-10-21T00:00:00Z' }
 
@@ -41,6 +41,15 @@ describe('api client', () => {
     expect(url).toBe('/api/todos/1')
     expect(init.method).toBe('PATCH')
     expect(JSON.parse(init.body)).toEqual({ done: true })
+  })
+
+  it('renames a todo', async () => {
+    const fetch = mockFetch(200, { ...todo, title: 'Buy oat milk' })
+    await expect(renameTodo('1', 'Buy oat milk')).resolves.toMatchObject({ title: 'Buy oat milk' })
+    const [url, init] = fetch.mock.calls[0]
+    expect(url).toBe('/api/todos/1')
+    expect(init.method).toBe('PATCH')
+    expect(JSON.parse(init.body)).toEqual({ title: 'Buy oat milk' })
   })
 
   it('throws with the status code when the request fails', async () => {

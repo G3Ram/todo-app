@@ -56,3 +56,39 @@ def test_delete_unknown_id_is_404(client: TestClient) -> None:
 
 def test_rejects_long_title(client: TestClient) -> None:
     assert client.post("/todos", json={"title": "x" * 201}).status_code == 422
+
+
+def test_patch_title_is_trimmed(client: TestClient) -> None:
+    todo = client.post("/todos", json={"title": "x"}).json()
+    res = client.patch(f"/todos/{todo['id']}", json={"title": "  Buy oat milk  "})
+    assert res.status_code == 200
+    assert res.json()["title"] == "Buy oat milk"
+    assert res.json()["done"] is False
+    assert client.get("/todos").json()[0]["title"] == "Buy oat milk"
+
+
+def test_patch_title_and_done_together(client: TestClient) -> None:
+    todo = client.post("/todos", json={"title": "x"}).json()
+    res = client.patch(f"/todos/{todo['id']}", json={"title": "y", "done": True})
+    assert res.json()["title"] == "y"
+    assert res.json()["done"] is True
+
+
+def test_patch_done_keeps_title(client: TestClient) -> None:
+    todo = client.post("/todos", json={"title": "x"}).json()
+    assert client.patch(f"/todos/{todo['id']}", json={"done": True}).json()["title"] == "x"
+
+
+def test_patch_with_neither_field_is_422(client: TestClient) -> None:
+    todo = client.post("/todos", json={"title": "x"}).json()
+    assert client.patch(f"/todos/{todo['id']}", json={}).status_code == 422
+
+
+def test_patch_rejects_blank_or_long_title(client: TestClient) -> None:
+    todo = client.post("/todos", json={"title": "x"}).json()
+    for title in ("", "   ", "x" * 201):
+        assert client.patch(f"/todos/{todo['id']}", json={"title": title}).status_code == 422
+
+
+def test_patch_title_unknown_id_is_404(client: TestClient) -> None:
+    assert client.patch("/todos/nope", json={"title": "y"}).status_code == 404
