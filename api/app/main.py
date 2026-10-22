@@ -4,9 +4,10 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from google.cloud import firestore
 
 from app.models import Todo, TodoCreate, TodoUpdate
-from app.repository import InMemoryTodoRepository, TodoRepository
+from app.repository import FirestoreTodoRepository, InMemoryTodoRepository, TodoRepository
 
 app = FastAPI(title="Todo API")
 
@@ -22,6 +23,8 @@ app.add_middleware(
 
 @lru_cache
 def get_repository() -> TodoRepository:
+    if os.getenv("STORAGE") == "firestore":
+        return FirestoreTodoRepository(firestore.Client())
     return InMemoryTodoRepository()
 
 

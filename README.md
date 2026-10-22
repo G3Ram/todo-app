@@ -19,6 +19,10 @@ npm --prefix web run dev                               # http://localhost:5173
 
 The frontend proxies `/api/*` to the backend, so there's nothing to configure.
 
+By default todos live in memory and vanish on restart. To store them in Firestore, run
+`gcloud auth application-default login` once, then start the backend with `STORAGE=firestore`
+(the Google Cloud project comes from your gcloud config).
+
 ## Deploy the frontend
 
 Firebase Hosting serves `web/dist` (config in `firebase.json`). Build with the Cloud Run URL, then deploy:
