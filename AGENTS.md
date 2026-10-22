@@ -26,15 +26,18 @@ Run from the repo root. Don't `cd`. All must pass before a task is done.
 npm ci --prefix web
 npm --prefix web run lint
 npm --prefix web run typecheck
-npm --prefix web test
+npm --prefix web run test:coverage
 
 # backend
 uv sync --directory api
 uv run --directory api ruff check .
 uv run --directory api ruff format --check .
 uv run --directory api mypy
-uv run --directory api pytest
+uv run --directory api pytest --cov
 ```
+
+If they exist, also run: `npm --prefix web run check:api` (API contract) and `npm --prefix web run e2e` (browser tests).
+CI also runs dependency audits and CodeQL. If CI flags a vulnerable package, upgrade it rather than ignoring the finding.
 
 Run the backend locally: `uv run --directory api uvicorn app.main:app --reload`
 Run the frontend locally: `npm --prefix web run dev` (proxies `/api` to the backend)
@@ -47,6 +50,41 @@ Run the frontend locally: `npm --prefix web run dev` (proxies `/api` to the back
 - API shape changes need matching updates in `web/src/api.ts` and its types.
 - Match existing patterns in nearby files before inventing new ones.
 - If a check fails, fix it. Don't skip, delete, or weaken tests to make them pass.
+
+## Testing strategy
+Pick the test that matches the change. Most changes need more than one.
+
+| Change | Test it with |
+|---|---|
+| Storage logic | Repository unit tests against `InMemoryTodoRepository` (and the Firestore integration suite once it exists) |
+| Route or validation | API tests with the `client` fixture: happy path, 404, 422 |
+| UI behavior | Vitest + Testing Library in `web/src`, mocking `./api` |
+| `web/src/api.ts` | `web/src/api.test.ts`, stubbing `fetch` |
+| A user-facing flow end to end | One Playwright test in `web/e2e/` (keep these few: core flows only) |
+| API request/response shape | Regenerate the API types and update callers |
+
+- Coverage floors: 85% backend, 85% lines frontend. Don't lower them, and don't add `# pragma: no cover` or coverage excludes to get under them.
+- Test behavior through public interfaces, not private helpers.
+- Pure logic (dates, filtering) goes in small functions with direct unit tests. Pass "now" in instead of reading the clock.
+
+## Security rules
+- Validate all input at the API boundary with Pydantic: types, lengths, allowed values. Never trust the client.
+- Never log or return secrets, tokens, or full request bodies.
+- Config and secrets come from environment variables only. Never hardcode keys, URLs with credentials, or project IDs.
+- CORS stays restricted to `ALLOWED_ORIGINS`. Never `*`.
+- Don't build queries, shell commands, or HTML from user input by string concatenation.
+- New dependencies: prefer well-known, maintained packages, and say why in the PR description.
+- For LLM features: treat model output as untrusted input. Validate it with Pydantic before using it, and never let it trigger writes without a code path that checks it.
+
+## Review guidelines
+For reviewers (Codex, or a human). Flag these as blocking:
+- Any violation of the security rules above
+- Behavior changes without tests, or tests that don't actually assert the new behavior
+- API shape changes without matching `web/src/api.ts` updates
+- Storage code outside `repository.py`, or business logic in route handlers
+- Changes outside the issue's scope
+
+Don't block on: formatting (CI handles it), naming preferences, or style that matches nearby code.
 
 ## Don't touch
 - `.github/workflows/`

@@ -1,0 +1,29 @@
+# Weekly dependency update PRs, grouped so you get a few PRs instead of dozens.
+# Security fixes come separately and right away once "Dependabot security updates" is on in settings.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+    groups:
+      web-dependencies:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: uv
+    directory: /api
+    schedule:
+      interval: weekly
+    groups:
+      api-dependencies:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

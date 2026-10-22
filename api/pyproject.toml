@@ -14,6 +14,7 @@ dev = [
     "httpx>=0.28",
     "ruff>=0.8",
     "mypy>=1.13",
+    "pytest-cov>=7.1.0",
 ]
 
 [tool.ruff]
@@ -29,3 +30,16 @@ packages = ["app"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "integration: needs the Firestore emulator (run via firebase emulators:exec)",
+]
+# Integration tests are opt-in: run them with `pytest -m integration`.
+addopts = "-m 'not integration'"
+
+[tool.coverage.run]
+source = ["app"]
+
+[tool.coverage.report]
+# CI fails below this. Raise it over time, never lower it to get a PR through.
+fail_under = 85
+show_missing = true

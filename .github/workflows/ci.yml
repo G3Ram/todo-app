@@ -1,11 +1,29 @@
 # The gate. Every PR, human or agent, has to pass this.
 # Keep these commands in sync with the Commands section of AGENTS.md.
+#
+# Jobs and what they protect against:
+#   frontend     lint, types, unit tests + coverage floor, production build
+#   backend      lint, format, types (strict), unit/API tests + coverage floor
+#   security     known-vulnerable dependencies (pip-audit, npm audit, dependency review)
+#   contract     frontend types drifting from the API schema   (activates when check:api exists)
+#   e2e          the real app broken in a browser               (activates when Playwright is set up)
+#   integration  Firestore behaving differently than in-memory  (activates when integration tests exist)
+#
+# The last three pass with "skipped" until their tests exist, so they can be required checks today.
 name: CI
 
 on:
   pull_request:
   push:
     branches: [main]
+
+# Least privilege by default. Jobs ask for more only if they need it.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   frontend:
@@ -24,7 +42,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm test
+      - run: npm run test:coverage
       - run: npm run build
 
   backend:
@@ -36,8 +54,127 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v6
-      - run: uv sync
+      - run: uv sync --frozen
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy
-      - run: uv run pytest
+      - run: uv run pytest --cov
+
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Python dependencies (pip-audit)
+        run: |
+          uv export --directory api --frozen --no-dev --no-emit-project \
+            --format requirements-txt --quiet -o "$RUNNER_TEMP/requirements.txt"
+          uvx pip-audit --strict --disable-pip -r "$RUNNER_TEMP/requirements.txt"
+
+      - name: npm dependencies (npm audit, runtime deps, high and critical)
+        run: npm audit --prefix web --omit=dev --audit-level=high
+
+      # Blocks a PR that adds a dependency with a known high-severity vulnerability,
+      # or one with a license you don't want. Needs the dependency graph (on by default for public repos).
+      - name: Dependency review
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v5.0.0
+        with:
+          fail-on-severity: high
+
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - id: has
+        run: |
+          if grep -q '"check:api"' web/package.json; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No check:api script yet. Skipping."
+          fi
+      - if: steps.has.outputs.enabled == 'true'
+        uses: astral-sh/setup-uv@v6
+      - if: steps.has.outputs.enabled == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - if: steps.has.outputs.enabled == 'true'
+        run: |
+          uv sync --directory api --frozen
+          npm ci --prefix web
+          npm --prefix web run check:api
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - id: has
+        run: |
+          if [ -f web/playwright.config.ts ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No Playwright config yet. Skipping."
+          fi
+      - if: steps.has.outputs.enabled == 'true'
+        uses: astral-sh/setup-uv@v6
+      - if: steps.has.outputs.enabled == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - if: steps.has.outputs.enabled == 'true'
+        run: |
+          uv sync --directory api --frozen
+          npm ci --prefix web
+          npx --prefix web playwright install --with-deps chromium
+      # Playwright's webServer config starts the API and the frontend itself.
+      - if: steps.has.outputs.enabled == 'true'
+        run: npm --prefix web run e2e
+      - if: failure() && steps.has.outputs.enabled == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: web/playwright-report
+          retention-days: 7
+
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - id: has
+        run: |
+          if [ -d api/tests/integration ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No integration tests yet. Skipping."
+          fi
+      - if: steps.has.outputs.enabled == 'true'
+        uses: astral-sh/setup-uv@v6
+      - if: steps.has.outputs.enabled == 'true'
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - if: steps.has.outputs.enabled == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # A "demo-" project ID runs fully offline: no GCP account or credentials involved.
+      - if: steps.has.outputs.enabled == 'true'
+        run: |
+          uv sync --directory api --frozen
+          npm install -g firebase-tools
+          firebase emulators:exec --only firestore --project demo-todo \
+            "uv run --directory api pytest -m integration"
