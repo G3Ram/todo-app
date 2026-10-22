@@ -9,13 +9,15 @@ import uuid
 from datetime import UTC, datetime
 from typing import Protocol
 
-from app.models import Todo, TodoCreate
+from app.models import Todo, TodoCreate, TodoUpdate
 
 
 class TodoRepository(Protocol):
     def list(self) -> list[Todo]: ...
 
     def create(self, data: TodoCreate) -> Todo: ...
+
+    def update(self, todo_id: str, data: TodoUpdate) -> Todo | None: ...
 
 
 class InMemoryTodoRepository:
@@ -33,3 +35,11 @@ class InMemoryTodoRepository:
         )
         self._todos[todo.id] = todo
         return todo
+
+    def update(self, todo_id: str, data: TodoUpdate) -> Todo | None:
+        todo = self._todos.get(todo_id)
+        if todo is None:
+            return None
+        updated = todo.model_copy(update={"done": data.done})
+        self._todos[todo_id] = updated
+        return updated
