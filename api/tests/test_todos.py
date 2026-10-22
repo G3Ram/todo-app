@@ -92,3 +92,36 @@ def test_patch_rejects_blank_or_long_title(client: TestClient) -> None:
 
 def test_patch_title_unknown_id_is_404(client: TestClient) -> None:
     assert client.patch("/todos/nope", json={"title": "y"}).status_code == 404
+
+
+def test_create_with_due_date(client: TestClient) -> None:
+    res = client.post("/todos", json={"title": "x", "due_date": "2026-11-01"})
+    assert res.json()["due_date"] == "2026-11-01"
+    assert client.get("/todos").json()[0]["due_date"] == "2026-11-01"
+
+
+def test_due_date_defaults_to_null(client: TestClient) -> None:
+    assert client.post("/todos", json={"title": "x"}).json()["due_date"] is None
+
+
+def test_rejects_invalid_due_date(client: TestClient) -> None:
+    for bad in ("tomorrow", "2026-13-01", "2026-11-01T10:00:00"):
+        assert client.post("/todos", json={"title": "x", "due_date": bad}).status_code == 422
+    todo = client.post("/todos", json={"title": "x"}).json()
+    assert client.patch(f"/todos/{todo['id']}", json={"due_date": "nope"}).status_code == 422
+
+
+def test_patch_sets_and_clears_due_date(client: TestClient) -> None:
+    todo = client.post("/todos", json={"title": "x"}).json()
+    res = client.patch(f"/todos/{todo['id']}", json={"due_date": "2026-11-01"})
+    assert res.json()["due_date"] == "2026-11-01"
+
+    res = client.patch(f"/todos/{todo['id']}", json={"due_date": None})
+    assert res.status_code == 200
+    assert res.json()["due_date"] is None
+
+
+def test_patch_other_fields_keeps_due_date(client: TestClient) -> None:
+    todo = client.post("/todos", json={"title": "x", "due_date": "2026-11-01"}).json()
+    res = client.patch(f"/todos/{todo['id']}", json={"done": True})
+    assert res.json()["due_date"] == "2026-11-01"

@@ -10,6 +10,7 @@ const todo = (id: string, title: string): api.Todo => ({
   id,
   title,
   done: false,
+  due_date: null,
   created_at: '2026-10-21T00:00:00Z',
 })
 
@@ -38,9 +39,37 @@ describe('App', () => {
     await userEvent.type(await screen.findByLabelText('New todo'), 'Walk dog')
     await userEvent.click(screen.getByRole('button', { name: 'Add' }))
 
-    expect(api.createTodo).toHaveBeenCalledWith('Walk dog')
+    expect(api.createTodo).toHaveBeenCalledWith('Walk dog', undefined)
     expect(await screen.findByText('Walk dog')).toBeInTheDocument()
     expect(screen.getByLabelText('New todo')).toHaveValue('')
+  })
+
+  it('adds a todo with a due date', async () => {
+    vi.mocked(api.listTodos).mockResolvedValue([])
+    vi.mocked(api.createTodo).mockResolvedValue({ ...todo('2', 'Walk dog'), due_date: '2099-01-05' })
+    render(<App />)
+
+    await userEvent.type(await screen.findByLabelText('New todo'), 'Walk dog')
+    await userEvent.type(screen.getByLabelText('Due date'), '2099-01-05')
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+    expect(api.createTodo).toHaveBeenCalledWith('Walk dog', '2099-01-05')
+    expect(await screen.findByText('Jan 5, 2099')).toBeInTheDocument()
+    expect(screen.getByLabelText('Due date')).toHaveValue('')
+  })
+
+  it('marks past-due undone todos as overdue, but not done or future ones', async () => {
+    vi.mocked(api.listTodos).mockResolvedValue([
+      { ...todo('1', 'late'), due_date: '2000-01-02' },
+      { ...todo('2', 'finished'), due_date: '2000-01-03', done: true },
+      { ...todo('3', 'later'), due_date: '2099-01-04' },
+    ])
+    render(<App />)
+
+    expect(await screen.findByText('Overdue: Jan 2, 2000')).toBeInTheDocument()
+    expect(screen.getByText('Jan 3, 2000')).toBeInTheDocument()
+    expect(screen.getByText('Jan 4, 2099')).toBeInTheDocument()
+    expect(screen.getAllByText(/Overdue/)).toHaveLength(1)
   })
 
   it('ignores blank input', async () => {
@@ -149,6 +178,64 @@ describe('App', () => {
       await userEvent.type(input(), ' x{Enter}')
       expect(await screen.findByRole('alert')).toHaveTextContent('Could not rename todo.')
       expect(screen.getByText('Buy milk')).toBeInTheDocument()
+    })
+  })
+
+  describe('filters and count', () => {
+    const done = (id: string, title: string) => ({ ...todo(id, title), done: true })
+    async function setup() {
+      vi.mocked(api.listTodos).mockResolvedValue([todo('1', 'Buy milk'), done('2', 'Walk dog')])
+      render(<App />)
+      await screen.findByText('Buy milk')
+    }
+
+    it('filters by Active and Done and marks the selected button', async () => {
+      await setup()
+      const all = screen.getByRole('button', { name: 'All' })
+      expect(all).toHaveAttribute('aria-pressed', 'true')
+
+      await userEvent.click(screen.getByRole('button', { name: 'Active' }))
+      expect(screen.getByRole('button', { name: 'Active' })).toHaveAttribute('aria-pressed', 'true')
+      expect(all).toHaveAttribute('aria-pressed', 'false')
+      expect(screen.getByText('Buy milk')).toBeInTheDocument()
+      expect(screen.queryByText('Walk dog')).not.toBeInTheDocument()
+
+      await userEvent.click(screen.getByRole('button', { name: 'Done' }))
+      expect(screen.queryByText('Buy milk')).not.toBeInTheDocument()
+      expect(screen.getByText('Walk dog')).toBeInTheDocument()
+
+      await userEvent.click(all)
+      expect(screen.getByText('Buy milk')).toBeInTheDocument()
+      expect(screen.getByText('Walk dog')).toBeInTheDocument()
+    })
+
+    it('says "3 items left" for several active todos', async () => {
+      vi.mocked(api.listTodos).mockResolvedValue([todo('1', 'A'), todo('2', 'B'), todo('3', 'C')])
+      render(<App />)
+      expect(await screen.findByText('3 items left')).toBeInTheDocument()
+    })
+
+    it('says "1 item left" for one active todo', async () => {
+      await setup()
+      expect(screen.getByText('1 item left')).toBeInTheDocument()
+    })
+
+    it('clear done deletes every done todo', async () => {
+      await setup()
+      vi.mocked(api.deleteTodo).mockResolvedValue(undefined)
+      await userEvent.click(screen.getByRole('button', { name: 'Clear done' }))
+      expect(api.deleteTodo).toHaveBeenCalledTimes(1)
+      expect(api.deleteTodo).toHaveBeenCalledWith('2')
+      expect(screen.queryByText('Walk dog')).not.toBeInTheDocument()
+      expect(screen.getByText('Buy milk')).toBeInTheDocument()
+    })
+
+    it('clear done keeps todos whose delete failed and shows an error', async () => {
+      await setup()
+      vi.mocked(api.deleteTodo).mockRejectedValue(new Error('down'))
+      await userEvent.click(screen.getByRole('button', { name: 'Clear done' }))
+      expect(await screen.findByRole('alert')).toHaveTextContent('Could not clear all done todos.')
+      expect(screen.getByText('Walk dog')).toBeInTheDocument()
     })
   })
 
