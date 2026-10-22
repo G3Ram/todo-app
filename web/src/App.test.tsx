@@ -98,6 +98,60 @@ describe('App', () => {
     expect(screen.getByText('Buy milk')).toBeInTheDocument()
   })
 
+  describe('editing', () => {
+    async function setup() {
+      vi.mocked(api.listTodos).mockResolvedValue([todo('1', 'Buy milk')])
+      vi.mocked(api.renameTodo).mockResolvedValue(todo('1', 'Buy oat milk'))
+      render(<App />)
+      await screen.findByText('Buy milk')
+    }
+    const input = () => screen.getByLabelText('Edit title of Buy milk')
+
+    it('saves on Enter after clicking Edit', async () => {
+      await setup()
+      await userEvent.click(screen.getByRole('button', { name: 'Edit Buy milk' }))
+      await userEvent.clear(input())
+      await userEvent.type(input(), 'Buy oat milk{Enter}')
+      expect(api.renameTodo).toHaveBeenCalledTimes(1)
+      expect(api.renameTodo).toHaveBeenCalledWith('1', 'Buy oat milk')
+      expect(await screen.findByText('Buy oat milk')).toBeInTheDocument()
+    })
+
+    it('starts editing on double-click and saves on blur', async () => {
+      await setup()
+      await userEvent.dblClick(screen.getByText('Buy milk'))
+      await userEvent.type(input(), ' x')
+      await userEvent.tab()
+      expect(api.renameTodo).toHaveBeenCalledWith('1', 'Buy milk x')
+    })
+
+    it('cancels on Escape', async () => {
+      await setup()
+      await userEvent.click(screen.getByRole('button', { name: 'Edit Buy milk' }))
+      await userEvent.type(input(), ' x{Escape}')
+      expect(api.renameTodo).not.toHaveBeenCalled()
+      expect(screen.getByText('Buy milk')).toBeInTheDocument()
+    })
+
+    it('cancels when the title is blank', async () => {
+      await setup()
+      await userEvent.click(screen.getByRole('button', { name: 'Edit Buy milk' }))
+      await userEvent.clear(input())
+      await userEvent.type(input(), '   {Enter}')
+      expect(api.renameTodo).not.toHaveBeenCalled()
+      expect(screen.getByText('Buy milk')).toBeInTheDocument()
+    })
+
+    it('shows an error when rename fails', async () => {
+      await setup()
+      vi.mocked(api.renameTodo).mockRejectedValue(new Error('down'))
+      await userEvent.click(screen.getByRole('button', { name: 'Edit Buy milk' }))
+      await userEvent.type(input(), ' x{Enter}')
+      expect(await screen.findByRole('alert')).toHaveTextContent('Could not rename todo.')
+      expect(screen.getByText('Buy milk')).toBeInTheDocument()
+    })
+  })
+
   it('shows an error when loading fails', async () => {
     vi.mocked(api.listTodos).mockRejectedValue(new Error('down'))
     render(<App />)
