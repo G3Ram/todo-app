@@ -1,9 +1,11 @@
-# The helper. Mention @claude in any issue or PR comment to ask a question
+# The helper. Mention @claude in a new issue, or in any issue or PR comment, to ask a question
 # or request a change (for example, "@claude fix the review comments").
 # For implementing a whole issue, use the agent-ready label instead (claude-implement.yml).
 name: Claude
 
 on:
+  issues:
+    types: [opened]
   issue_comment:
     types: [created]
   pull_request_review_comment:
@@ -15,7 +17,9 @@ concurrency:
 
 jobs:
   claude:
-    if: contains(github.event.comment.body, '@claude')
+    if: |
+      (github.event_name == 'issues' && contains(github.event.issue.body, '@claude')) ||
+      (github.event_name != 'issues' && contains(github.event.comment.body, '@claude'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
