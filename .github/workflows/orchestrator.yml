@@ -1,0 +1,46 @@
+# The foreman. When an agent PR is merged, pick the next queued issue and label it
+# agent-ready, which starts claude-implement.yml. Your merge is the gate between tasks.
+#
+# Queue issues:   gh issue edit <N> --add-label queued
+# Turn on:        gh variable set ORCHESTRATOR_ENABLED --body true
+# Pause:          gh variable set ORCHESTRATOR_ENABLED --body false
+# Kick off:       gh workflow run orchestrator.yml
+name: Orchestrator
+
+on:
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+
+concurrency:
+  group: orchestrator
+  cancel-in-progress: false
+
+jobs:
+  next-task:
+    if: |
+      vars.ORCHESTRATOR_ENABLED == 'true' && (
+        github.event_name == 'workflow_dispatch' ||
+        (github.event.pull_request.merged == true &&
+         startsWith(github.event.pull_request.head.ref, 'agent/'))
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+      id-token: write
+    env:
+      GH_TOKEN: ${{ secrets.FACTORY_PAT }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: "/orchestrate ${{ github.event.pull_request.number }}"
+          claude_args: |
+            --max-turns 15
+            --allowedTools "Read,Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh pr comment:*)"
