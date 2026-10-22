@@ -77,6 +77,16 @@ body {
   color: var(--muted);
 }
 
+.due {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.due.overdue {
+  color: #b00020;
+  font-weight: 600;
+}
+
 .empty {
   color: var(--muted);
 }

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createTodo, listTodos, renameTodo, setTodoDone } from './api'
 
-const todo = { id: '1', title: 'Buy milk', done: false, created_at: '2026-10-21T00:00:00Z' }
+const todo = { id: '1', title: 'Buy milk', done: false, due_date: null, created_at: '2026-10-21T00:00:00Z' }
 
 function mockFetch(status: number, body: unknown) {
   const fn = vi.fn().mockResolvedValue({
@@ -32,6 +32,12 @@ describe('api client', () => {
     expect(init.method).toBe('POST')
     expect(JSON.parse(init.body)).toEqual({ title: 'Buy milk' })
     expect(init.headers).toEqual({ 'Content-Type': 'application/json' })
+  })
+
+  it('creates a todo with a due date', async () => {
+    const fetch = mockFetch(201, { ...todo, due_date: '2026-11-01' })
+    await createTodo('Buy milk', '2026-11-01')
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ title: 'Buy milk', due_date: '2026-11-01' })
   })
 
   it('marks a todo done', async () => {

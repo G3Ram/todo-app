@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { formatDueDate, isOverdue, todayISO } from './dates'
 import { createTodo, deleteTodo, listTodos, renameTodo, setTodoDone, type Todo } from './api'
 
 const FILTERS = ['All', 'Active', 'Done'] as const
@@ -7,6 +8,7 @@ type Filter = (typeof FILTERS)[number]
 export default function App() {
   const [todos, setTodos] = useState<Todo[]>([])
   const [title, setTitle] = useState('')
+  const [dueDate, setDueDate] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<Filter>('All')
@@ -45,9 +47,10 @@ export default function App() {
     const trimmed = title.trim()
     if (!trimmed) return
     try {
-      const todo = await createTodo(trimmed)
+      const todo = await createTodo(trimmed, dueDate || undefined)
       setTodos((prev) => [...prev, todo])
       setTitle('')
+      setDueDate('')
       setError(null)
     } catch {
       setError('Could not add todo.')
@@ -77,6 +80,8 @@ export default function App() {
     }
   }
 
+  const today = todayISO()
+
   async function handleClearDone() {
     const done = todos.filter((t) => t.done)
     const results = await Promise.allSettled(done.map((t) => deleteTodo(t.id)))
@@ -103,6 +108,10 @@ export default function App() {
           placeholder="What needs doing?"
           maxLength={200}
         />
+        <label htmlFor="new-due" className="visually-hidden">
+          Due date
+        </label>
+        <input id="new-due" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
         <button type="submit">Add</button>
       </form>
 
@@ -146,6 +155,12 @@ export default function App() {
                   />
                   <span onDoubleClick={() => startEdit(todo)}>{todo.title}</span>
                 </label>
+              )}
+              {todo.due_date && (
+                <span className={isOverdue(todo.due_date, todo.done, today) ? 'due overdue' : 'due'}>
+                  {isOverdue(todo.due_date, todo.done, today) && 'Overdue: '}
+                  {formatDueDate(todo.due_date)}
+                </span>
               )}
               <button type="button" aria-label={`Edit ${todo.title}`} onClick={() => startEdit(todo)}>
                 Edit

@@ -34,6 +34,7 @@ class InMemoryTodoRepository:
         todo = Todo(
             id=uuid.uuid4().hex,
             title=data.title.strip(),
+            due_date=data.due_date,
             created_at=datetime.now(UTC),
         )
         self._todos[todo.id] = todo
@@ -43,7 +44,13 @@ class InMemoryTodoRepository:
         todo = self._todos.get(todo_id)
         if todo is None:
             return None
-        updated = todo.model_copy(update=data.model_dump(exclude_none=True))
+        # due_date may be set to None (clear); a None title/done means unchanged.
+        changes = {
+            k: v
+            for k, v in data.model_dump(exclude_unset=True).items()
+            if v is not None or k == "due_date"
+        }
+        updated = todo.model_copy(update=changes)
         self._todos[todo_id] = updated
         return updated
 
