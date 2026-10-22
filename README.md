@@ -23,6 +23,15 @@ By default todos live in memory and vanish on restart. To store them in Firestor
 `gcloud auth application-default login` once, then start the backend with `STORAGE=firestore`
 (the Google Cloud project comes from your gcloud config).
 
+## Run in Docker
+
+```bash
+docker build -t todo-api api
+docker run --rm -p 8080:8080 todo-api    # http://localhost:8080/docs
+```
+
+The container listens on `$PORT` (Cloud Run sets it) and defaults to 8080.
+
 ## Deploy the frontend
 
 Firebase Hosting serves `web/dist` (config in `firebase.json`). Build with the Cloud Run URL, then deploy:
