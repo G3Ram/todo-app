@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { createTodo, listTodos, setTodoDone, type Todo } from './api'
+import { createTodo, deleteTodo, listTodos, setTodoDone, type Todo } from './api'
 
 export default function App() {
   const [todos, setTodos] = useState<Todo[]>([])
@@ -41,6 +41,16 @@ export default function App() {
     }
   }
 
+  async function handleDelete(id: string) {
+    try {
+      await deleteTodo(id)
+      setTodos((prev) => prev.filter((t) => t.id !== id))
+      setError(null)
+    } catch {
+      setError('Could not delete todo.')
+    }
+  }
+
   return (
     <main className="app">
       <h1>Todos</h1>
@@ -77,6 +87,9 @@ export default function App() {
                 />
                 <span>{todo.title}</span>
               </label>
+              <button type="button" aria-label={`Delete ${todo.title}`} onClick={() => handleDelete(todo.id)}>
+                ×
+              </button>
             </li>
           ))}
         </ul>
