@@ -95,7 +95,14 @@ export default function App() {
 
   return (
     <main className="app">
-      <h1>Todos</h1>
+      <header className="header">
+        <h1>Todos</h1>
+        {!loading && todos.length > 0 && (
+          <p className="count">
+            {left} {left === 1 ? 'item' : 'items'} left
+          </p>
+        )}
+      </header>
 
       <form onSubmit={handleSubmit} className="add-form">
         <label htmlFor="new-todo" className="visually-hidden">
@@ -118,7 +125,7 @@ export default function App() {
       {error && <p role="alert">{error}</p>}
 
       {loading ? (
-        <p>Loading...</p>
+        <p className="loading">Loading...</p>
       ) : todos.length === 0 ? (
         <p className="empty">Nothing to do yet.</p>
       ) : (
@@ -135,6 +142,7 @@ export default function App() {
             <li key={todo.id} className={todo.done ? 'done' : undefined}>
               {editing?.id === todo.id ? (
                 <input
+                  className="edit-input"
                   aria-label={`Edit title of ${todo.title}`}
                   value={editing.text}
                   maxLength={200}
@@ -162,19 +170,16 @@ export default function App() {
                   {formatDueDate(todo.due_date)}
                 </span>
               )}
-              <button type="button" aria-label={`Edit ${todo.title}`} onClick={() => startEdit(todo)}>
+              <button type="button" className="row-action" aria-label={`Edit ${todo.title}`} onClick={() => startEdit(todo)}>
                 Edit
               </button>
-              <button type="button" aria-label={`Delete ${todo.title}`} onClick={() => handleDelete(todo.id)}>
+              <button type="button" className="row-action delete" aria-label={`Delete ${todo.title}`} onClick={() => handleDelete(todo.id)}>
                 ×
               </button>
             </li>
           ))}
         </ul>
-        <p>
-          {left} {left === 1 ? 'item' : 'items'} left
-        </p>
-        <button type="button" onClick={handleClearDone} disabled={left === todos.length}>
+        <button type="button" className="clear-done" onClick={handleClearDone} disabled={left === todos.length}>
           Clear done
         </button>
         </>
