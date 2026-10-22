@@ -13,7 +13,8 @@ Works the same in CI and on your laptop (`/implement-issue 42`).
 - Run `gh issue view $ARGUMENTS --comments`.
 - Read the Goal, Acceptance criteria, Where to look, and Out of scope sections.
 - If the acceptance criteria are missing or contradict each other, stop. Comment on the issue with `gh issue comment $ARGUMENTS` explaining what you need, and do nothing else.
-- If `gh pr list --search "#$ARGUMENTS in:body"` shows an open PR for this issue already, comment with its link and stop.
+- Check for an existing PR from a previous run with `gh pr list --head agent/issue-$ARGUMENTS --state open`. Only that exact branch counts: ignore other PRs that merely mention this issue number (Dependabot PRs often do). If one exists and isn't a draft, comment with its link and stop. If it's a draft, check out that branch and continue the work there instead of starting over.
+- Whenever you stop early for any reason, say why in an issue comment. Never stop silently.
 
 ## 2. Branch
 ```bash
