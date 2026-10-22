@@ -55,3 +55,25 @@ Every PR has to pass these before it can merge:
 | Codex review | Logic and design problems, rule violations from `AGENTS.md` |
 
 Plus GitHub secret scanning with push protection, and Dependabot. See `SECURITY.md`.
+
+## Models and usage
+
+**Which model runs what**
+
+| Agent | Default model | Change it with |
+|---|---|---|
+| Implement (Small issue) | `sonnet` | `gh variable set MODEL_SMALL --body haiku` |
+| Implement (Medium issue) | `sonnet` | `gh variable set MODEL_MEDIUM --body opus` |
+| Implement (Large issue) | `opus` | `gh variable set MODEL_LARGE --body sonnet` |
+| Implement (no size) | `sonnet` | `gh variable set MODEL_DEFAULT --body ...` |
+| `@claude` helper | `sonnet` | `gh variable set MODEL_HELPER --body ...` |
+| Orchestrator | `haiku` | `gh variable set MODEL_ORCHESTRATOR --body ...` |
+
+To force a model for one issue, add a label: `model:haiku`, `model:sonnet`, or `model:opus`. The label wins over the issue's size.
+
+**Seeing usage**
+
+- **Per run:** every implement run comments on its PR with the model used, turns, tokens (input, output, cache), and an estimated cost. The same table is in the run's job summary.
+- **Totals:** `./scripts/usage-report.sh` (last 30 days) or `./scripts/usage-report.sh 7`, broken down by role and model, plus the most expensive runs.
+
+Costs are estimates at API prices. With a Claude subscription token, runs count against your plan's usage limits rather than being billed.
