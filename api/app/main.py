@@ -49,3 +49,9 @@ def update_todo(todo_id: str, data: TodoUpdate, repo: Repo) -> Todo:
     if todo is None:
         raise HTTPException(status_code=404, detail="Todo not found")
     return todo
+
+
+@app.delete("/todos/{todo_id}", status_code=204)
+def delete_todo(todo_id: str, repo: Repo) -> None:
+    if not repo.delete(todo_id):
+        raise HTTPException(status_code=404, detail="Todo not found")

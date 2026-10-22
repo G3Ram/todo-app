@@ -18,6 +18,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     throw new Error(`Request failed: ${res.status}`)
   }
+  if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
 }
 
@@ -30,6 +31,10 @@ export function setTodoDone(id: string, done: boolean): Promise<Todo> {
     method: 'PATCH',
     body: JSON.stringify({ done }),
   })
+}
+
+export function deleteTodo(id: string): Promise<void> {
+  return request<void>(`/todos/${id}`, { method: 'DELETE' })
 }
 
 export function createTodo(title: string): Promise<Todo> {

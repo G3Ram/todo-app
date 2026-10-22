@@ -19,6 +19,8 @@ class TodoRepository(Protocol):
 
     def update(self, todo_id: str, data: TodoUpdate) -> Todo | None: ...
 
+    def delete(self, todo_id: str) -> bool: ...
+
 
 class InMemoryTodoRepository:
     def __init__(self) -> None:
@@ -43,3 +45,6 @@ class InMemoryTodoRepository:
         updated = todo.model_copy(update={"done": data.done})
         self._todos[todo_id] = updated
         return updated
+
+    def delete(self, todo_id: str) -> bool:
+        return self._todos.pop(todo_id, None) is not None
