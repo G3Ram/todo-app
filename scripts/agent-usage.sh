@@ -6,15 +6,19 @@
 #
 # Usage: scripts/agent-usage.sh <execution-file> <role> [issue-number]
 #   role: implement | helper | orchestrator
+#   COMMENT_ON=<number> (env): comment on exactly this issue or PR instead
+#   (used by the @claude helper, which works on whatever thread it was called from)
 # Writes:
 #   - a table to the job summary ($GITHUB_STEP_SUMMARY)
 #   - agent-usage.json (numbers only) for the workflow to upload as an artifact
 #   - with an issue number: a comment on the agent's PR (or the issue if no PR)
+#   - with COMMENT_ON: a comment on that issue or PR
 set -euo pipefail
 
 EXEC_FILE="${1:-}"
 ROLE="${2:-unknown}"
 ISSUE="${3:-}"
+COMMENT_ON="${COMMENT_ON:-}"
 OUT="${USAGE_OUT:-agent-usage.json}"
 SUMMARY="${GITHUB_STEP_SUMMARY:-/dev/stdout}"
 RUN_URL="${RUN_URL:-}"
@@ -26,7 +30,7 @@ if [ -z "$EXEC_FILE" ] || [ ! -s "$EXEC_FILE" ]; then
   exit 0
 fi
 
-jq --arg role "$ROLE" --arg issue "$ISSUE" \
+jq --arg role "$ROLE" --arg issue "${ISSUE:-$COMMENT_ON}" \
    --arg run_id "${GITHUB_RUN_ID:-}" --arg run_url "$RUN_URL" '
   ([.[] | select(.type == "system" and .subtype == "init")] | first) as $init |
   ([.[] | select(.type == "result")] | last) as $r |
@@ -80,10 +84,16 @@ TABLE=$(jq -r --arg reason "${MODEL_REASON:-}" '
   echo "$TABLE"
 } >> "$SUMMARY"
 
-# Comment on the agent's PR if there is one, otherwise on the issue.
-if [ -n "$ISSUE" ] && command -v gh >/dev/null 2>&1; then
+BODY=$(printf '<details><summary>Agent usage for this run (%s)</summary>\n\n%s\n\n[Run log](%s)\n</details>' "$ROLE" "$TABLE" "$RUN_URL")
+
+if [ -n "$COMMENT_ON" ] && command -v gh >/dev/null 2>&1; then
+  # Helper runs: comment on the thread where @claude was called.
+  # The issues comments API works for both issues and PRs.
+  gh api "repos/{owner}/{repo}/issues/$COMMENT_ON/comments" -f body="$BODY" >/dev/null \
+    || echo "Couldn't comment on #$COMMENT_ON"
+elif [ -n "$ISSUE" ] && command -v gh >/dev/null 2>&1; then
+  # Implement runs: comment on the agent's PR if there is one, otherwise on the issue.
   PR=$(gh pr list --head "agent/issue-$ISSUE" --state open --json number --jq '.[0].number // empty' 2>/dev/null || true)
-  BODY=$(printf '<details><summary>Agent usage for this run</summary>\n\n%s\n\n[Run log](%s)\n</details>' "$TABLE" "$RUN_URL")
   if [ -n "$PR" ]; then
     gh pr comment "$PR" --body "$BODY" >/dev/null || echo "Couldn't comment on PR #$PR"
   else
