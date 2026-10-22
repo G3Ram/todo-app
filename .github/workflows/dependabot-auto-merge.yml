@@ -1,0 +1,37 @@
+# Auto-merges Dependabot PRs that are safe to take without a human:
+#   - npm and uv only (workflow updates stay manual)
+#   - minor and patch updates (most security fixes are patch releases, so they're covered)
+# It only turns on GitHub's auto-merge. The PR still has to pass every required
+# check in branch protection before it merges, so a broken update never lands.
+# Major upgrades get a comment and wait for you.
+name: Dependabot auto-merge
+
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PR_URL: ${{ github.event.pull_request.html_url }}
+    steps:
+      - id: meta
+        uses: dependabot/fetch-metadata@v3
+
+      - name: Enable auto-merge for minor and patch updates
+        if: |
+          steps.meta.outputs.package-ecosystem != 'github_actions' &&
+          (steps.meta.outputs.update-type == 'version-update:semver-minor' ||
+           steps.meta.outputs.update-type == 'version-update:semver-patch')
+        run: gh pr merge --auto --squash "$PR_URL"
+
+      - name: Flag major upgrades for a human
+        if: steps.meta.outputs.update-type == 'version-update:semver-major'
+        run: |
+          gh pr comment "$PR_URL" --body "Major version upgrade, so this one waits for you. Check the changelog for breaking changes. If CI fails, comment \`@claude update the code for this upgrade and make the checks pass\`."
