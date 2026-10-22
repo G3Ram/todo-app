@@ -23,6 +23,17 @@ By default todos live in memory and vanish on restart. To store them in Firestor
 `gcloud auth application-default login` once, then start the backend with `STORAGE=firestore`
 (the Google Cloud project comes from your gcloud config).
 
+## Deploy the frontend
+
+Firebase Hosting serves `web/dist` (config in `firebase.json`). Build with the Cloud Run URL, then deploy:
+
+```bash
+VITE_API_URL=https://<your-cloud-run-url> npm --prefix web run build
+firebase deploy --only hosting
+```
+
+See `web/.env.example`. Add the Hosting origin to the API's `ALLOWED_ORIGINS`.
+
 ## How work gets done
 
 1. Pick the next issue from the backlog (`backlog/`, or the GitHub issues created from it).
