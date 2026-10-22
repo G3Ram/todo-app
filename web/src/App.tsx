@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { createTodo, listTodos, type Todo } from './api'
+import { createTodo, listTodos, setTodoDone, type Todo } from './api'
 
 export default function App() {
   const [todos, setTodos] = useState<Todo[]>([])
@@ -25,6 +25,19 @@ export default function App() {
       setError(null)
     } catch {
       setError('Could not add todo.')
+    }
+  }
+
+  async function handleToggle(id: string, done: boolean) {
+    const setDone = (value: boolean) =>
+      setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, done: value } : t)))
+    setDone(done)
+    try {
+      await setTodoDone(id, done)
+      setError(null)
+    } catch {
+      setDone(!done)
+      setError('Could not update todo.')
     }
   }
 
@@ -55,7 +68,16 @@ export default function App() {
       ) : (
         <ul className="todo-list">
           {todos.map((todo) => (
-            <li key={todo.id}>{todo.title}</li>
+            <li key={todo.id} className={todo.done ? 'done' : undefined}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={todo.done}
+                  onChange={(e) => handleToggle(todo.id, e.target.checked)}
+                />
+                <span>{todo.title}</span>
+              </label>
+            </li>
           ))}
         </ul>
       )}
