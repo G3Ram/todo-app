@@ -1,6 +1,8 @@
 # The assembly line.
 # Add the "agent-ready" label to an issue -> Claude implements it, runs the checks,
 # and opens the PR itself. CI and the review workflow then run on that PR.
+# If the run stops early (turn limit, timeout, crash), the safety net step saves
+# whatever was done as a draft PR, so work is never thrown away.
 name: Claude Implement
 
 on:
@@ -16,7 +18,7 @@ jobs:
     # Only this label starts a run. Without this check, every label burns minutes.
     if: github.event.label.name == 'agent-ready'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     permissions:
       contents: write
       pull-requests: write
@@ -27,6 +29,8 @@ jobs:
       # Personal access token so the PR Claude opens triggers CI and review.
       # PRs opened with the default GITHUB_TOKEN don't start other workflows.
       GH_TOKEN: ${{ secrets.FACTORY_PAT }}
+      ISSUE: ${{ github.event.issue.number }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -49,6 +53,8 @@ jobs:
           git config user.email "factory-bot@users.noreply.github.com"
 
       - uses: anthropics/claude-code-action@v1
+        # Step timeout (not just the job timeout) so the safety net below still gets to run.
+        timeout-minutes: 45
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # The orchestrator may add the label as Claude. Safe: a human merge
@@ -63,5 +69,36 @@ jobs:
             security-guidance@claude-code-plugins
           prompt: "/implement-issue ${{ github.event.issue.number }}"
           claude_args: |
-            --max-turns 60
+            --max-turns 100
             --allowedTools "Read,Edit,Write,Glob,Grep,Bash(git:*),Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh pr create:*),Bash(gh pr list:*),Bash(npm:*),Bash(npx:*),Bash(uv:*)"
+
+      # Runs even if the Claude step failed, timed out, or ran out of turns.
+      - name: Safety net - save unfinished work as a draft PR
+        if: always()
+        run: |
+          BRANCH="agent/issue-$ISSUE"
+
+          # Claude already opened a PR? Nothing to do.
+          if [ "$(gh pr list --head "$BRANCH" --state open --json number --jq length)" != "0" ]; then
+            echo "PR already exists for $BRANCH"
+            exit 0
+          fi
+
+          # Move onto the agent branch, carrying any uncommitted changes along.
+          if [ "$(git rev-parse --abbrev-ref HEAD)" != "$BRANCH" ]; then
+            git checkout -B "$BRANCH"
+          fi
+          git add -A
+          git diff --cached --quiet || git commit -m "WIP: unfinished agent run for #$ISSUE"
+
+          # No commits beyond main means there's no work to save.
+          if [ "$(git rev-list --count origin/main..HEAD)" = "0" ]; then
+            gh issue comment "$ISSUE" --body "The agent run ended without making any changes and without opening a PR. Run log: $RUN_URL"
+            exit 0
+          fi
+
+          git push -u origin "$BRANCH" --force-with-lease
+          gh pr create --draft --base main --head "$BRANCH" \
+            --title "WIP: #$ISSUE (agent run did not finish)" \
+            --body "$(printf 'Closes #%s\n\nThe agent run stopped before finishing (turn limit, timeout, or error), so this is whatever it got done. Checks may be failing.\n\n**Next:** look at the diff and the run log, then either finish it here (for example comment `@claude finish this and make the checks pass`) or close it and fix the issue text.\n\nRun log: %s' "$ISSUE" "$RUN_URL")"
+          gh issue comment "$ISSUE" --body "The agent run didn't finish. Saved its work as a draft PR for you to check. Run log: $RUN_URL"
