@@ -1,0 +1,56 @@
+# Dependency updates, tuned for low noise:
+#   - monthly, not weekly
+#   - one PR per ecosystem for everything (minor, patch, and major grouped separately)
+#   - security fixes grouped into one PR per ecosystem too
+#   - a 7-day cooldown, so brand-new releases (where most supply-chain attacks hide) wait a week
+# Minor and patch PRs for npm and uv merge themselves once CI passes (dependabot-auto-merge.yml).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
+    groups:
+      web-security:
+        applies-to: security-updates
+        patterns: ["*"]
+      web-minor-and-patch:
+        update-types: [minor, patch]
+        patterns: ["*"]
+      web-major:
+        update-types: [major]
+        patterns: ["*"]
+
+  - package-ecosystem: uv
+    directory: /api
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
+    groups:
+      api-security:
+        applies-to: security-updates
+        patterns: ["*"]
+      api-minor-and-patch:
+        update-types: [minor, patch]
+        patterns: ["*"]
+      api-major:
+        update-types: [major]
+        patterns: ["*"]
+
+  # Workflow changes can't be auto-merged with the default token, so this one
+  # stays manual: one PR a month, one click.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 1
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
